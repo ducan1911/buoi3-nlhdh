@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>File System Management — Quản lý hệ thống file</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ─── TOKENS ─── */
+:root {
+  --bg: #080c14;
+  --surface: #0f1623;
+  --surface2: #161f30;
+  --surface3: #1d2840;
+  --border: rgba(56,139,253,0.12);
+  --border2: rgba(56,139,253,0.28);
+  --border3: rgba(56,139,253,0.5);
+  --blue: #388bfd;
+  --blue-dim: rgba(56,139,253,0.15);
+  --green: #3fb950;
+  --green-dim: rgba(63,185,80,0.14);
+  --amber: #d29922;
+  --amber-dim: rgba(210,153,34,0.14);
+  --red: #f85149;
+  --red-dim: rgba(248,81,73,0.14);
+  --teal: #39d0c4;
+  --teal-dim: rgba(57,208,196,0.13);
+  --text: #e6edf3;
+  --text2: #7d8590;
+  --text3: #3d4450;
+  --mono: 'JetBrains Mono', monospace;
+  --body: 'Outfit', sans-serif;
+  --display: 'Bebas Neue', cursive;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+
+/* ─── GRID BACKGROUND ─── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(56,139,253,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56,139,253,0.03) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+}
+
+/* ─── HERO ─── */
+.hero {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  overflow: hidden;
+}
+
+.hero-glow {
+  position: absolute;
+  width: 700px; height: 400px;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-55%);
+  background: radial-gradient(ellipse, rgba(56,139,253,0.18) 0%, rgba(57,208,196,0.06) 40%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-orbit {
+  position: absolute;
+  width: 500px; height: 500px;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  border: 1px solid rgba(56,139,253,0.07);
+  border-radius: 50%;
+  animation: spin 30s linear infinite;
+  pointer-events: none;
+}
+
+.hero-orbit::before {
+  content: '';
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--blue);
+  top: -4px; left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0 12px var(--blue);
+}
+
+@keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+.hero-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--blue);
+  text-transform: uppercase;
+  border: 1px solid var(--border2);
+  padding: 6px 18px;
+  border-radius: 2px;
+  margin-bottom: 2rem;
+  background: var(--blue-dim);
+  display: inline-block;
+  animation: fadeUp .6s ease both;
+}
+
+.hero h1 {
+  font-family: var(--display);
+  font-size: clamp(4rem, 10vw, 8rem);
+  line-height: .92;
+  letter-spacing: 2px;
+  color: var(--text);
+  margin-bottom: 1.5rem;
+  animation: fadeUp .6s .1s ease both;
+}
+
+.hero h1 .accent { color: var(--blue); }
+.hero h1 .line2 { display: block; color: var(--teal); }
+
+.hero-sub {
+  font-size: 1.1rem;
+  color: var(--text2);
+  max-width: 520px;
+  margin: 0 auto 3rem;
+  font-weight: 300;
+  animation: fadeUp .6s .2s ease both;
+}
+
+.hero-chapters {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+  animation: fadeUp .6s .3s ease both;
+}
+
+.hc-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all .2s;
+  letter-spacing: .5px;
+}
+.hc-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--blue-dim);
+}
+
+.scroll-hint {
+  position: absolute; bottom: 2rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  animation: bounce 2s ease infinite;
+}
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+/* ─── FLOATING NAV ─── */
+.fnav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(8,12,20,0.88);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  display: flex; align-items: center; gap: 0;
+  overflow-x: auto;
+}
+.fnav-item {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 14px 18px;
+  color: var(--text2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all .2s;
+  text-decoration: none;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  display: block;
+}
+.fnav-item:hover { color: var(--text); }
+.fnav-item.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* ─── CHAPTER SECTIONS ─── */
+.chapter {
+  position: relative; z-index: 1;
+  max-width: 1040px; margin: 0 auto;
+  padding: 5rem 2rem;
+}
+
+.chapter-header {
+  margin-bottom: 3rem;
+}
+
+.ch-num {
+  font-family: var(--display);
+  font-size: 7rem;
+  line-height: 1;
+  color: var(--surface3);
+  position: absolute;
+  right: 2rem; top: 4rem;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ch-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: .75rem;
+}
+
+.ch-title {
+  font-family: var(--display);
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  letter-spacing: 1px;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+.ch-title .hi { color: var(--blue); }
+.ch-title .hi-green { color: var(--green); }
+.ch-title .hi-amber { color: var(--amber); }
+.ch-title .hi-red { color: var(--red); }
+.ch-title .hi-teal { color: var(--teal); }
+
+.ch-desc {
+  font-size: .95rem;
+  color: var(--text2);
+  max-width: 560px;
+  margin-top: .75rem;
+  font-weight: 300;
+  line-height: 1.75;
+}
+
+/* ─── DIVIDER ─── */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+  margin: 0 2rem;
+}
+
+/* ─── CARDS ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.75rem;
+  margin-bottom: 1.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .25s;
+}
+.card:hover { border-color: var(--border2); }
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0; top: auto; height: 1px;
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+  opacity: 0;
+  transition: opacity .3s;
+}
+.card:hover::after { opacity: .35; }
+
+.card-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: .6rem;
+}
+
+.card h3 {
+  font-family: var(--body);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: .75rem;
+}
+
+.card p {
+  font-size: .9rem;
+  color: var(--text2);
+  line-height: 1.75;
+  margin-bottom: .6rem;
+}
+.card p:last-child { margin-bottom: 0; }
+
+/* ─── GRID ─── */
+.g2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.g3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+
+.kcard {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.4rem;
+  transition: transform .2s, border-color .2s;
+}
+.kcard:hover { transform: translateY(-2px); border-color: var(--border2); }
+
+.kcard-icon {
+  font-size: 1.5rem;
+  margin-bottom: .75rem;
+  display: block;
+}
+
+.kcard h4 {
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: .4rem;
+}
+.kcard p { font-size: .85rem; color: var(--text2); line-height: 1.65; }
+.kcard .stat { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; color: var(--blue); margin-bottom: .2rem; }
+
+/* ─── TAGS / CHIPS ─── */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: .75rem; }
+.tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  letter-spacing: .5px;
+  font-weight: 500;
+}
+.tb { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(56,139,253,0.25); }
+.tg { background: var(--green-dim); color: var(--green); border: 1px solid rgba(63,185,80,0.25); }
+.ta { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(210,153,34,0.25); }
+.tr { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,81,73,0.25); }
+.tt { background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(57,208,196,0.25); }
+
+/* ─── ALERT BOXES ─── */
+.alert {
+  border-radius: 6px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.alert-body h4 { font-size: .9rem; font-weight: 600; margin-bottom: .3rem; }
+.alert-body p { font-size: .85rem; line-height: 1.65; }
+.alert-danger { background: var(--red-dim); border: 1px solid rgba(248,81,73,0.25); }
+.alert-danger h4, .alert-danger .alert-icon { color: var(--red); }
+.alert-danger p { color: #ffb3b0; }
+.alert-warn { background: var(--amber-dim); border: 1px solid rgba(210,153,34,0.25); }
+.alert-warn h4, .alert-warn .alert-icon { color: var(--amber); }
+.alert-warn p { color: #f0c070; }
+.alert-success { background: var(--green-dim); border: 1px solid rgba(63,185,80,0.25); }
+.alert-success h4, .alert-success .alert-icon { color: var(--green); }
+.alert-success p { color: #8dd4a0; }
+.alert-info { background: var(--blue-dim); border: 1px solid rgba(56,139,253,0.25); }
+.alert-info h4, .alert-info .alert-icon { color: var(--blue); }
+.alert-info p { color: #93c5fd; }
+
+/* ─── HDD VISUALIZER ─── */
+.hdd-wrap {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.hdd-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: .75rem;
+  letter-spacing: .5px;
+}
+
+.hdd-grid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 3px;
+  margin-bottom: .75rem;
+}
+
+.sector {
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--surface3);
+  cursor: pointer;
+  transition: transform .15s;
+  position: relative;
+}
+.sector:hover { transform: scale(1.2); z-index: 2; }
+.sector.sys { background: var(--red-dim); border-color: rgba(248,81,73,0.4); }
+.sector.used { background: var(--blue-dim); border-color: rgba(56,139,253,0.35); }
+.sector.frag { background: var(--amber-dim); border-color: rgba(210,153,34,0.35); }
+.sector.ssd { background: var(--green-dim); border-color: rgba(63,185,80,0.35); }
+
+.hdd-legend {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  font-size: 12px; color: var(--text2);
+}
+.leg { display: flex; align-items: center; gap: 6px; }
+.leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* ─── DRIVE DIAGRAM ─── */
+.drive-diagram {
+  display: flex;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  flex-wrap: wrap;
+}
+
+.drive-box {
+  flex: 1; min-width: 200px;
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.drive-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: .06;
+}
+
+.drive-c { background: var(--surface2); }
+.drive-d { background: var(--surface2); border-color: rgba(63,185,80,0.25); }
+
+.drive-letter {
+  font-family: var(--display);
+  font-size: 3.5rem;
+  line-height: 1;
+  margin-bottom: .4rem;
+}
+.drive-c .drive-letter { color: var(--blue); }
+.drive-d .drive-letter { color: var(--green); }
+
+.drive-box h4 { font-size: .9rem; font-weight: 600; color: var(--text); margin-bottom: .4rem; }
+.drive-box p { font-size: .82rem; color: var(--text2); line-height: 1.6; }
+.drive-box ul { margin: .5rem 0 0 1rem; }
+.drive-box li { font-size: .82rem; color: var(--text2); line-height: 1.8; }
+
+.drive-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface3);
+  margin: .75rem 0 .4rem;
+  overflow: hidden;
+}
+.drive-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+.drive-c .drive-bar-fill { background: var(--blue); width: 78%; }
+.drive-d .drive-bar-fill { background: var(--green); width: 35%; }
+.drive-size-text { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+
+/* ─── DISK PARTITION SLIDER ─── */
+.partition-demo {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+.partition-bar {
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+}
+.pb-c {
+  background: rgba(56,139,253,0.2);
+  border-right: 2px solid var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--blue);
+  font-weight: 700;
+  transition: width .3s;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+.pb-d {
+  background: rgba(63,185,80,0.15);
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--green);
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+.slider-wrap { display: flex; align-items: center; gap: 12px; }
+.slider-wrap label { font-size: 13px; color: var(--text2); white-space: nowrap; }
+input[type=range] {
+  flex: 1;
+  accent-color: var(--blue);
+  height: 4px;
+  cursor: pointer;
+}
+.slider-rec {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: .5rem;
+  padding: .5rem .75rem;
+  background: var(--surface3);
+  border-radius: 4px;
+}
+
+/* ─── FILE TREE ─── */
+.tree-wrap {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 2;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+.tree-root { color: var(--blue); font-weight: 700; }
+.tree-sys { color: var(--red); }
+.tree-sys-sub { color: #ff8a80; }
+.tree-warn { color: var(--amber); }
+.tree-safe { color: var(--green); }
+.tree-dim { color: var(--text3); }
+.tree-comment {
+  color: var(--text3);
+  font-size: 11px;
+  letter-spacing: .3px;
+}
+
+/* ─── FILESYSTEM COMPARE ─── */
+.fs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.fs-card {
+  border-radius: 8px;
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+  background: var(--surface2);
+  transition: all .2s;
+}
+.fs-card:hover { transform: translateY(-3px); }
+
+.fs-card.ntfs { border-top: 3px solid var(--blue); }
+.fs-card.fat32 { border-top: 3px solid var(--amber); }
+.fs-card.exfat { border-top: 3px solid var(--teal); }
+
+.fs-name {
+  font-family: var(--display);
+  font-size: 2.2rem;
+  letter-spacing: 1px;
+  margin-bottom: .5rem;
+}
+.fs-card.ntfs .fs-name { color: var(--blue); }
+.fs-card.fat32 .fs-name { color: var(--amber); }
+.fs-card.exfat .fs-name { color: var(--teal); }
+
+.fs-card h4 { font-size: .85rem; font-weight: 500; color: var(--text2); margin-bottom: .75rem; }
+.fs-spec { font-size: .82rem; color: var(--text2); line-height: 1.8; }
+.fs-spec strong { color: var(--text); font-weight: 500; }
+
+/* ─── STEPS ─── */
+.steps { display: grid; gap: .6rem; margin: .75rem 0; }
+
+.step {
+  display: flex;
+  gap: 14px;
+  padding: .9rem 1.1rem;
+  background: var(--surface2);
+  border-radius: 6px;
+  border-left: 3px solid var(--blue);
+  align-items: flex-start;
+  transition: background .2s;
+}
+.step:hover { background: var(--surface3); }
+.step-n {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blue);
+  min-width: 22px;
+  padding-top: 1px;
+}
+.step-body { font-size: .875rem; color: var(--text2); line-height: 1.65; }
+.step-body strong { color: var(--text); font-weight: 600; }
+.step-body code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--teal);
+}
+
+/* ─── CODE BLOCKS ─── */
+.code-block {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .9rem 1.25rem;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--teal);
+  margin: .5rem 0;
+  overflow-x: auto;
+  line-height: 1.8;
+  position: relative;
+}
+.code-block::before {
+  content: '$ ';
+  color: var(--text3);
+}
+.code-block.no-prefix::before { content: ''; }
+
+/* ─── COMPARISON TABLE ─── */
+.comp-table { width: 100%; border-collapse: collapse; font-size: .875rem; margin-bottom: 1rem; }
+.comp-table th {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text2);
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  background: var(--surface2);
+}
+.comp-table td {
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  vertical-align: middle;
+}
+.comp-table tr:hover td { background: var(--surface2); }
+.comp-table td:first-child { color: var(--text); font-weight: 500; }
+.comp-table .good { color: var(--green); font-weight: 500; }
+.comp-table .bad { color: var(--red); font-weight: 500; }
+.comp-table .ok { color: var(--amber); font-weight: 500; }
+
+/* ─── QUIZ ─── */
+.quiz-container { position: relative; }
+
+.quiz-progress {
+  display: flex; gap: 5px; margin-bottom: 1.25rem;
+}
+.qprog-dot {
+  height: 3px; flex: 1; border-radius: 2px;
+  background: var(--surface3);
+  transition: background .3s;
+}
+.qprog-dot.done { background: var(--green); }
+.qprog-dot.active { background: var(--blue); }
+
+.quiz-q {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 1.1rem;
+  line-height: 1.55;
+}
+.quiz-counter {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  margin-bottom: .6rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.quiz-opts { display: grid; gap: 8px; }
+.qopt {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: .9rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--body);
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.qopt::before {
+  content: attr(data-letter);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  width: 20px;
+  flex-shrink: 0;
+}
+.qopt:hover:not(:disabled) {
+  border-color: var(--border2);
+  background: var(--surface3);
+  color: var(--text);
+}
+.qopt.correct {
+  background: var(--green-dim);
+  border-color: rgba(63,185,80,0.4);
+  color: var(--green);
+}
+.qopt.correct::before { color: var(--green); }
+.qopt.wrong {
+  background: var(--red-dim);
+  border-color: rgba(248,81,73,0.4);
+  color: var(--red);
+}
+.qopt.wrong::before { color: var(--red); }
+
+.quiz-feedback {
+  margin-top: .9rem;
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  font-size: .875rem;
+  line-height: 1.65;
+  animation: fadeUp .25s ease;
+}
+.qf-correct { background: var(--green-dim); border: 1px solid rgba(63,185,80,0.3); color: #8dd4a0; }
+.qf-wrong { background: var(--red-dim); border: 1px solid rgba(248,81,73,0.3); color: #ffb3b0; }
+.qf-correct strong, .qf-wrong strong { display: block; font-size: .95rem; margin-bottom: .3rem; }
+.qf-correct strong { color: var(--green); }
+.qf-wrong strong { color: var(--red); }
+
+.quiz-next {
+  margin-top: .75rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 9px 22px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all .2s;
+}
+.quiz-next:hover { background: var(--blue-dim); border-color: var(--border3); }
+
+/* ─── SCORE CARD ─── */
+.score-card {
+  text-align: center;
+  padding: 2rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  animation: fadeUp .4s ease;
+}
+.score-num {
+  font-family: var(--display);
+  font-size: 5rem;
+  letter-spacing: 2px;
+  line-height: 1;
+  margin-bottom: .5rem;
+}
+.score-card p { font-size: .95rem; color: var(--text2); margin-bottom: 1rem; }
+.score-card button {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 10px 28px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all .2s;
+}
+.score-card button:hover { background: var(--blue-dim); }
+
+/* ─── FOOTER ─── */
+footer {
+  position: relative; z-index: 1;
+  text-align: center;
+  padding: 2.5rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ─── APPEAR ON SCROLL ─── */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity .55s ease, transform .55s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width:600px) {
+  .hero h1 { font-size: 3.8rem; }
+  .ch-title { font-size: 2.2rem; }
+  .ch-num { display: none; }
+  .hdd-grid { grid-template-columns: repeat(10,1fr); }
+  .comp-table { font-size: .78rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-orbit"></div>
+
+  <div class="hero-tag">Buổi học · File System Management</div>
+
+  <h1>
+    Quản Lý
+    <span class="line2">Hệ Thống File</span>
+  </h1>
+
+  <p class="hero-sub">
+    Hiểu cách ổ cứng hoạt động, tổ chức dữ liệu, và làm chủ công cụ quản lý phân vùng trên Windows như một chuyên gia.
+  </p>
+
+  <div class="hero-chapters">
+    <a href="#ch1" class="hc-btn">01 / Ổ cứng hoạt động ra sao</a>
+    <a href="#ch2" class="hc-btn">02 / HDD vs SSD</a>
+    <a href="#ch3" class="hc-btn">03 / Định dạng file system</a>
+    <a href="#ch4" class="hc-btn">04 / Cây thư mục</a>
+    <a href="#ch5" class="hc-btn">05 / Thực hành Windows</a>
+    <a href="#ch6" class="hc-btn">06 / Kiểm tra</a>
+  </div>
+
+  <div class="scroll-hint">↓ &nbsp; cuộn xuống để bắt đầu</div>
+</section>
+
+<!-- ══════════════ NAV ══════════════ -->
+<nav class="fnav">
+  <a href="#ch1" class="fnav-item active">01 · Ổ cứng</a>
+  <a href="#ch2" class="fnav-item">02 · HDD vs SSD</a>
+  <a href="#ch3" class="fnav-item">03 · File system</a>
+  <a href="#ch4" class="fnav-item">04 · Cây thư mục</a>
+  <a href="#ch5" class="fnav-item">05 · Thực hành</a>
+  <a href="#ch6" class="fnav-item">06 · Quiz</a>
+</nav>
+
+<!-- ══════════════ CH1: Ổ cứng ══════════════ -->
+<section id="ch1">
+<div class="divider"></div>
+<div class="chapter">
+  <div class="chapter-header reveal">
+    <div class="ch-num">01</div>
+    <div class="ch-tag">Lý thuyết cơ bản</div>
+    <h2 class="ch-title">Ổ cứng <span class="hi">lưu dữ liệu</span><br>như thế nào?</h2>
+    <p class="ch-desc">Dữ liệu không được lưu như một khối duy nhất — ổ đĩa chia không gian thành hàng nghìn ô nhỏ và theo dõi từng byte một cách có hệ thống.</p>
+  </div>
+
+  <!-- Sector visualizer -->
+  <div class="hdd-wrap reveal">
+    <div class="hdd-label">Trực quan hoá ổ đĩa 500 GB — mỗi ô = 1 cluster (4 KB)</div>
+    <div class="hdd-grid" id="hddGrid"></div>
+    <div class="hdd-legend">
+      <div class="leg"><div class="leg-dot" style="background:var(--red-dim);border:1px solid rgba(248,81,73,.4)"></div>File hệ thống (cấm xóa)</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--blue-dim);border:1px solid rgba(56,139,253,.35)"></div>Dữ liệu người dùng</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--amber-dim);border:1px solid rgba(210,153,34,.35)"></div>Phân mảnh (fragmented)</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--surface3);border:1px solid var(--border)"></div>Trống</div>
+    </div>
+    <p style="font-size:.82rem;color:var(--text3);margin-top:.6rem;font-family:var(--mono)">* Hover vào từng ô để xem trạng thái</p>
+  </div>
+
+  <div class="g3 reveal">
+    <div class="kcard">
+      <span class="kcard-icon">🔵</span>
+      <div class="stat">512 B / 4 KB</div>
+      <h4>Sector — đơn vị vật lý nhỏ nhất</h4>
+      <p>Ổ đĩa đọc và ghi theo đơn vị sector. Không thể đọc nhỏ hơn một sector.</p>
+    </div>
+    <div class="kcard">
+      <span class="kcard-icon">🟡</span>
+      <div class="stat">4–64 KB</div>
+      <h4>Cluster — đơn vị logic</h4>
+      <p>Tập hợp nhiều sector liên tiếp. File system cấp phát lưu trữ theo cluster, không phải sector.</p>
+    </div>
+    <div class="kcard">
+      <span class="kcard-icon">🟢</span>
+      <div class="stat">C: / D:</div>
+      <h4>Partition — phân vùng</h4>
+      <p>Chia một ổ vật lý thành nhiều vùng độc lập. Mỗi vùng có file system riêng.</p>
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">Khái niệm quan trọng</div>
+    <h3>Phân mảnh file (Fragmentation) là gì?</h3>
+    <p>Khi bạn xóa file và ghi file mới liên tục, ổ đĩa không còn chỗ liền kề để lưu toàn bộ file. Hệ điều hành buộc phải chia file ra nhiều mảnh, rải rác ở các cluster khác nhau trên ổ đĩa.</p>
+    <p>Với HDD: đầu đọc phải di chuyển cơ học qua lại nhiều vị trí → truy cập chậm hơn rõ rệt. Đây là lý do cần <strong>Defragment</strong> định kỳ. SSD thì không bị ảnh hưởng vì truy cập điện tử, không cơ học.</p>
+  </div>
+
+  <!-- HDD Anatomy Deep Dive -->
+  <div class="card reveal">
+    <div class="card-label">Cơ chế nội tại · HDD</div>
+    <h3>Bên trong ổ cứng HDD — Giải phẫu chi tiết</h3>
+    <p style="margin-bottom:1rem">HDD là thiết bị cơ điện tử — dữ liệu được ghi bằng từ tính lên bề mặt đĩa quay. Mỗi thao tác đọc/ghi đều trải qua 4 giai đoạn có thể đo được:</p>
+
+    <!-- HDD anatomy diagram using SVG -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-bottom:1rem;overflow-x:auto">
+      <svg width="100%" viewBox="0 0 680 320" style="max-width:680px;display:block;margin:0 auto" aria-label="Sơ đồ cấu trúc bên trong ổ cứng HDD">
+        <defs>
+          <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <!-- Platter circles -->
+        <circle cx="280" cy="160" r="120" fill="none" stroke="rgba(56,139,253,0.18)" stroke-width="1"/>
+        <circle cx="280" cy="160" r="100" fill="rgba(56,139,253,0.04)" stroke="rgba(56,139,253,0.25)" stroke-width="1.5"/>
+        <circle cx="280" cy="160" r="78"  fill="rgba(56,139,253,0.07)" stroke="rgba(56,139,253,0.22)" stroke-width="1"/>
+        <circle cx="280" cy="160" r="56"  fill="rgba(56,139,253,0.10)" stroke="rgba(56,139,253,0.20)" stroke-width="1"/>
+        <circle cx="280" cy="160" r="34"  fill="rgba(56,139,253,0.14)" stroke="rgba(56,139,253,0.28)" stroke-width="1"/>
+        <!-- Spindle -->
+        <circle cx="280" cy="160" r="14" fill="rgba(210,153,34,0.3)" stroke="rgba(210,153,34,0.6)" stroke-width="1.5"/>
+        <text x="280" y="165" text-anchor="middle" fill="#d29922" font-size="9" font-family="JetBrains Mono,monospace" font-weight="700">SPINDLE</text>
+        <!-- Track labels -->
+        <text x="390" y="72"  text-anchor="start" fill="rgba(56,139,253,0.5)" font-size="10" font-family="JetBrains Mono,monospace">Track ngoài cùng</text>
+        <line x1="388" y1="74" x2="370" y2="90" stroke="rgba(56,139,253,0.3)" stroke-width="0.8" marker-end="url(#arr2)"/>
+        <text x="390" y="142" text-anchor="start" fill="rgba(56,139,253,0.5)" font-size="10" font-family="JetBrains Mono,monospace">Track giữa</text>
+        <line x1="388" y1="144" x2="360" y2="150" stroke="rgba(56,139,253,0.3)" stroke-width="0.8" marker-end="url(#arr2)"/>
+        <!-- Sector highlight on outermost track -->
+        <path d="M 374 108 A 100 100 0 0 1 388 140" fill="none" stroke="#3fb950" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+        <text x="418" y="116" text-anchor="start" fill="#3fb950" font-size="10" font-family="JetBrains Mono,monospace">Sector (4 KB)</text>
+        <line x1="416" y1="116" x2="390" y2="124" stroke="rgba(63,185,80,0.5)" stroke-width="0.8" marker-end="url(#arr2)"/>
+        <!-- Read/Write Head arm -->
+        <line x1="280" y1="160" x2="370" y2="80" stroke="rgba(248,81,73,0.7)" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="370" cy="80" r="6" fill="rgba(248,81,73,0.3)" stroke="#f85149" stroke-width="1.5"/>
+        <text x="390" y="38" text-anchor="start" fill="#f85149" font-size="10" font-family="JetBrains Mono,monospace">Actuator Arm</text>
+        <text x="390" y="52" text-anchor="start" fill="#f85149" font-size="10" font-family="JetBrains Mono,monospace">+ Read/Write Head</text>
+        <line x1="388" y1="46" x2="374" y2="68" stroke="rgba(248,81,73,0.4)" stroke-width="0.8" marker-end="url(#arr2)"/>
+        <!-- Rotation arrow -->
+        <path d="M 230 62 A 110 110 0 0 1 168 185" fill="none" stroke="rgba(57,208,196,0.5)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr2)"/>
+        <text x="145" y="225" text-anchor="middle" fill="var(--teal)" font-size="10" font-family="JetBrains Mono,monospace">5400–7200</text>
+        <text x="145" y="238" text-anchor="middle" fill="var(--teal)" font-size="10" font-family="JetBrains Mono,monospace">RPM</text>
+        <!-- Platter label -->
+        <text x="148" y="145" text-anchor="middle" fill="rgba(56,139,253,0.6)" font-size="10" font-family="JetBrains Mono,monospace">Platter</text>
+        <text x="148" y="158" text-anchor="middle" fill="rgba(56,139,253,0.6)" font-size="10" font-family="JetBrains Mono,monospace">(đĩa từ)</text>
+        <!-- Timeline of a read operation -->
+        <text x="30" y="290" fill="rgba(125,133,144,0.9)" font-size="10" font-family="JetBrains Mono,monospace">Seek time (3–15ms)</text>
+        <rect x="28" y="295" width="120" height="8" rx="2" fill="rgba(248,81,73,0.3)" stroke="rgba(248,81,73,0.4)" stroke-width="0.5"/>
+        <text x="165" y="290" fill="rgba(125,133,144,0.9)" font-size="10" font-family="JetBrains Mono,monospace">Rotational latency (0–4ms)</text>
+        <rect x="163" y="295" width="140" height="8" rx="2" fill="rgba(210,153,34,0.3)" stroke="rgba(210,153,34,0.4)" stroke-width="0.5"/>
+        <text x="318" y="290" fill="rgba(125,133,144,0.9)" font-size="10" font-family="JetBrains Mono,monospace">Transfer (ms)</text>
+        <rect x="316" y="295" width="60" height="8" rx="2" fill="rgba(63,185,80,0.3)" stroke="rgba(63,185,80,0.4)" stroke-width="0.5"/>
+        <text x="30" y="315" fill="rgba(125,133,144,0.5)" font-size="9" font-family="JetBrains Mono,monospace">← Tổng thời gian truy cập 1 file = 8–20ms (so với SSD: 0.05ms)</text>
+      </svg>
+    </div>
+
+    <div class="g2" style="margin-bottom:.75rem">
+      <div class="kcard">
+        <span class="kcard-icon">📐</span>
+        <h4>Track &amp; Cylinder</h4>
+        <p><strong>Track</strong>: vòng tròn đồng tâm trên mặt đĩa. <strong>Cylinder</strong>: tập hợp các track ở cùng bán kính trên tất cả các platter — đầu đọc truy cập đồng thời.</p>
+      </div>
+      <div class="kcard">
+        <span class="kcard-icon">⏱️</span>
+        <h4>Seek time là nút thắt cổ chai</h4>
+        <p>Đầu đọc phải di chuyển cơ học đến đúng track mất <strong>3–15ms</strong>. Đây là lý do chính khiến HDD thua SSD khi truy cập ngẫu nhiên (random I/O).</p>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step"><div class="step-n">①</div><div class="step-body"><strong>Seek:</strong> Controller gửi lệnh → Actuator Arm di chuyển đầu đọc đến đúng track. Mất 3–15ms tùy vị trí.</div></div>
+      <div class="step"><div class="step-n">②</div><div class="step-body"><strong>Rotational Latency:</strong> Chờ đĩa quay đến đúng sector cần đọc. Trung bình = ½ vòng → ~4ms ở 7200 RPM.</div></div>
+      <div class="step"><div class="step-n">③</div><div class="step-body"><strong>Data Transfer:</strong> Đầu đọc cảm nhận từ trường trên mặt đĩa → chuyển thành tín hiệu điện → giải mã thành bit 0/1.</div></div>
+      <div class="step"><div class="step-n">④</div><div class="step-body"><strong>Cache:</strong> Dữ liệu đọc được lưu vào buffer cache (thường 64–256 MB) của controller để tăng tốc lần đọc tiếp theo.</div></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ CH2: HDD vs SSD ══════════════ -->
+<section id="ch2">
+<div class="divider"></div>
+<div class="chapter">
+  <div class="chapter-header reveal">
+    <div class="ch-num">02</div>
+    <div class="ch-tag">Công nghệ lưu trữ</div>
+    <h2 class="ch-title"><span class="hi-amber">HDD</span> vs <span class="hi-green">SSD</span><br>Ai thắng?</h2>
+    <p class="ch-desc">Hai công nghệ lưu trữ hoàn toàn khác nhau về nguyên lý — mỗi loại có ưu thế riêng ở từng tình huống.</p>
+  </div>
+
+  <div class="drive-diagram reveal">
+    <div class="drive-box drive-c">
+      <div class="drive-letter">HDD</div>
+      <h4>Ổ đĩa cơ (Hard Disk Drive)</h4>
+      <div class="drive-bar"><div class="drive-bar-fill" style="background:var(--amber);width:20%"></div></div>
+      <div class="drive-size-text">Tốc độ đọc tuần tự: ~150 MB/s</div>
+      <ul style="margin-top:.75rem">
+        <li>Đĩa từ quay 5400–7200 RPM</li>
+        <li>Đầu đọc di chuyển cơ học</li>
+        <li>Dung lượng lớn, giá rẻ (40–60 USD/TB)</li>
+        <li>Nhạy cảm với va đập, rung lắc</li>
+        <li>Bị ảnh hưởng bởi phân mảnh</li>
+      </ul>
+      <div class="tags"><span class="tag ta">Lưu trữ khối lượng lớn</span></div>
+    </div>
+    <div class="drive-box drive-d">
+      <div class="drive-letter">SSD</div>
+      <h4>Ổ thể rắn (Solid State Drive)</h4>
+      <div class="drive-bar"><div class="drive-bar-fill" style="background:var(--green);width:95%"></div></div>
+      <div class="drive-size-text">Tốc độ đọc NVMe: ~3000–7000 MB/s</div>
+      <ul style="margin-top:.75rem">
+        <li>Chip NAND flash, không cơ học</li>
+        <li>Truy cập điện tử tức thì</li>
+        <li>Giá cao hơn (~80–120 USD/TB)</li>
+        <li>Bền, im lặng, ít tỏa nhiệt</li>
+        <li>Không bị phân mảnh</li>
+      </ul>
+      <div class="tags"><span class="tag tg">Ổ hệ thống, boot nhanh</span></div>
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">Bảng so sánh chi tiết</div>
+    <div style="overflow-x:auto">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Tiêu chí</th>
+          <th>HDD (7200 RPM)</th>
+          <th>SSD SATA</th>
+          <th>SSD NVMe</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Tốc độ đọc</td><td class="bad">80–160 MB/s</td><td class="ok">450–550 MB/s</td><td class="good">3000–7000 MB/s</td></tr>
+        <tr><td>Tốc độ ghi</td><td class="bad">80–130 MB/s</td><td class="ok">400–500 MB/s</td><td class="good">2000–6500 MB/s</td></tr>
+        <tr><td>Thời gian truy cập (latency)</td><td class="bad">8–12 ms</td><td class="good">0.05–0.1 ms</td><td class="good">0.01–0.05 ms</td></tr>
+        <tr><td>Giá / TB</td><td class="good">~40–60 USD</td><td class="ok">~80–100 USD</td><td class="ok">~90–130 USD</td></tr>
+        <tr><td>Va đập / độ bền</td><td class="bad">Dễ hỏng</td><td class="good">Rất tốt</td><td class="good">Rất tốt</td></tr>
+        <tr><td>Boot Windows</td><td class="bad">45–90 giây</td><td class="good">15–20 giây</td><td class="good">8–12 giây</td></tr>
+        <tr><td>Tiếng ồn</td><td class="bad">Có tiếng quay</td><td class="good">Hoàn toàn im</td><td class="good">Hoàn toàn im</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="alert alert-success reveal">
+    <span class="alert-icon">💡</span>
+    <div class="alert-body">
+      <h4>Lời khuyên thực tế</h4>
+      <p>Cấu hình lý tưởng: SSD NVMe 256–512 GB làm ổ C: (hệ thống), HDD 1–2 TB làm ổ D: (lưu trữ phim, ảnh, backup). Bạn vừa nhanh vừa rộng rãi.</p>
+    </div>
+  </div>
+
+  <!-- SSD NAND Deep Dive -->
+  <div class="card reveal">
+    <div class="card-label">Cơ chế nội tại · SSD</div>
+    <h3>Bên trong SSD — Chip NAND Flash hoạt động thế nào?</h3>
+    <p style="margin-bottom:1rem">SSD không có bộ phận cơ học. Dữ liệu được lưu dưới dạng điện tích trong các ô nhớ (cell) bán dẫn. Hiểu nguyên lý này giúp bạn dùng SSD đúng cách và kéo dài tuổi thọ.</p>
+
+    <div class="g2" style="margin-bottom:1rem">
+      <div class="kcard" style="border-top:3px solid var(--green)">
+        <span class="kcard-icon">⚡</span>
+        <div class="stat" style="color:var(--green)">Cell NAND</div>
+        <h4>Đơn vị lưu trữ cơ bản</h4>
+        <p>Mỗi cell là một transistor float-gate giữ điện tích. Mức điện tích khác nhau = giá trị bit khác nhau. Không cần nguồn điện để giữ dữ liệu (non-volatile).</p>
+      </div>
+      <div class="kcard" style="border-top:3px solid var(--teal)">
+        <span class="kcard-icon">🔗</span>
+        <div class="stat" style="color:var(--teal)">Block &amp; Page</div>
+        <h4>Cấu trúc tổ chức</h4>
+        <p>Nhiều cell → <strong>Page</strong> (4–16 KB) — đơn vị ghi nhỏ nhất. Nhiều page → <strong>Block</strong> (128–512 KB) — đơn vị xóa nhỏ nhất. Không thể xóa từng page riêng lẻ.</p>
+      </div>
+    </div>
+
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:.75rem">Loại cell NAND — Càng nhiều bit/cell → rẻ hơn nhưng kém bền hơn</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">
+        <div style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.9rem;text-align:center">
+          <div style="font-family:var(--display);font-size:1.8rem;color:var(--green)">SLC</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text2);margin:.3rem 0">1 bit / cell</div>
+          <div style="font-size:.78rem;color:var(--text2)">Bền nhất<br>100,000 lần ghi<br>Giá rất cao<br>Dùng enterprise</div>
+        </div>
+        <div style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.9rem;text-align:center">
+          <div style="font-family:var(--display);font-size:1.8rem;color:var(--blue)">MLC</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text2);margin:.3rem 0">2 bit / cell</div>
+          <div style="font-size:.78rem;color:var(--text2)">Tốt<br>10,000 lần ghi<br>Giá cao<br>Workstation</div>
+        </div>
+        <div style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.9rem;text-align:center">
+          <div style="font-family:var(--display);font-size:1.8rem;color:var(--amber)">TLC</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text2);margin:.3rem 0">3 bit / cell</div>
+          <div style="font-size:.78rem;color:var(--text2)">Phổ biến nhất<br>3,000 lần ghi<br>Giá vừa<br>Consumer SSD</div>
+        </div>
+        <div style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.9rem;text-align:center">
+          <div style="font-family:var(--display);font-size:1.8rem;color:var(--red)">QLC</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text2);margin:.3rem 0">4 bit / cell</div>
+          <div style="font-size:.78rem;color:var(--text2)">Rẻ nhất<br>1,000 lần ghi<br>Giá thấp<br>Lưu trữ lạnh</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step" style="border-left-color:var(--green)"><div class="step-n" style="color:var(--green)">①</div><div class="step-body"><strong>Write (Ghi):</strong> Controller SSD ghi dữ liệu vào các page trống trong block. Ghi rất nhanh vì chỉ cần nạp điện tích vào cell.</div></div>
+      <div class="step" style="border-left-color:var(--amber)"><div class="step-n" style="color:var(--amber)">②</div><div class="step-body"><strong>Erase (Xóa) — điểm quan trọng:</strong> NAND Flash <em>không thể ghi đè trực tiếp</em>. Phải xóa cả block trước khi ghi mới. Xóa chậm hơn ghi ~10 lần.</div></div>
+      <div class="step" style="border-left-color:var(--teal)"><div class="step-n" style="color:var(--teal)">③</div><div class="step-body"><strong>Wear Leveling:</strong> Controller phân tán đều lượt ghi ra khắp block để tránh mài mòn một vùng quá nhiều. Kéo dài tuổi thọ SSD đáng kể.</div></div>
+      <div class="step" style="border-left-color:var(--blue)"><div class="step-n" style="color:var(--blue)">④</div><div class="step-body"><strong>Garbage Collection:</strong> Tiến trình nền thu gom các block có dữ liệu "đã xóa logic" → hợp nhất dữ liệu còn dùng → xóa block cũ → giải phóng block sạch để ghi tiếp. Giữ hiệu năng ổn định.</div></div>
+      <div class="step" style="border-left-color:var(--red)"><div class="step-n" style="color:var(--red)">⑤</div><div class="step-body"><strong>TRIM Command:</strong> Windows báo cho SSD biết block nào đã xóa → SSD chủ động dọn dẹp sớm hơn → không bị chậm khi đầy. Luôn bật TRIM trên Windows (<code>fsutil behavior query DisableDeleteNotify</code>).</div></div>
+    </div>
+
+    <div class="alert alert-warn" style="margin-top:.75rem">
+      <span class="alert-icon">⚠️</span>
+      <div class="alert-body">
+        <h4>SSD cũng có tuổi thọ ghi (TBW)</h4>
+        <p>Mỗi SSD có thông số <strong>TBW (Terabytes Written)</strong> — ví dụ Samsung 970 EVO 500GB = 300 TBW. Ghi 50 GB/ngày mất ~16 năm để hết TBW. Người dùng bình thường không cần lo, nhưng server hay máy trạm cần chú ý.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ CH3: File System ══════════════ -->
+<section id="ch3">
+<div class="divider"></div>
+<div class="chapter">
+  <div class="chapter-header reveal">
+    <div class="ch-num">03</div>
+    <div class="ch-tag">Định dạng & tổ chức</div>
+    <h2 class="ch-title">Định dạng<br><span class="hi-teal">File System</span></h2>
+    <p class="ch-desc">File system là "ngôn ngữ" mà ổ đĩa dùng để ghi nhớ file nào nằm ở đâu. Khác file system — không đọc được nhau.</p>
+  </div>
+
+  <div class="fs-grid reveal">
+    <div class="fs-card ntfs">
+      <div class="fs-name">NTFS</div>
+      <h4>New Technology File System</h4>
+      <div class="fs-spec">
+        <strong>Kích thước file tối đa:</strong> 16 EB (thực tế không giới hạn)<br>
+        <strong>Partition tối đa:</strong> 256 TB<br>
+        <strong>Journaling:</strong> Có — tự phục hồi khi mất điện<br>
+        <strong>Phân quyền:</strong> Có — kiểm soát ai đọc/ghi<br>
+        <strong>Mã hóa (EFS):</strong> Có<br>
+        <strong>Hỗ trợ:</strong> Windows (native), macOS (chỉ đọc), Linux (cần driver)
+      </div>
+      <div class="tags" style="margin-top:.75rem">
+        <span class="tag tb">Ổ C: hệ thống</span>
+        <span class="tag tb">Ổ D: trong máy</span>
+        <span class="tag tg">Khuyến nghị</span>
+      </div>
+    </div>
+
+    <div class="fs-card fat32">
+      <div class="fs-name">FAT32</div>
+      <h4>File Allocation Table 32-bit</h4>
+      <div class="fs-spec">
+        <strong>Kích thước file tối đa:</strong> 4 GB — đây là giới hạn chết<br>
+        <strong>Partition tối đa:</strong> 2 TB<br>
+        <strong>Journaling:</strong> Không — dễ mất dữ liệu khi tắt đột ngột<br>
+        <strong>Phân quyền:</strong> Không<br>
+        <strong>Hỗ trợ:</strong> Mọi hệ điều hành, TV, máy ảnh, game console
+      </div>
+      <div class="tags" style="margin-top:.75rem">
+        <span class="tag ta">USB nhỏ ≤32 GB</span>
+        <span class="tag ta">Thẻ nhớ cũ</span>
+        <span class="tag tr">Không dùng cho file &gt;4 GB</span>
+      </div>
+    </div>
+
+    <div class="fs-card exfat">
+      <div class="fs-name">exFAT</div>
+      <h4>Extended FAT — thế hệ mới</h4>
+      <div class="fs-spec">
+        <strong>Kích thước file tối đa:</strong> 16 EB (không giới hạn thực tế)<br>
+        <strong>Partition tối đa:</strong> 128 PB<br>
+        <strong>Journaling:</strong> Hạn chế<br>
+        <strong>Phân quyền:</strong> Không<br>
+        <strong>Hỗ trợ:</strong> Windows, macOS 10.6.5+, Linux 5.4+, Android
+      </div>
+      <div class="tags" style="margin-top:.75rem">
+        <span class="tag tt">USB lớn &gt;64 GB</span>
+        <span class="tag tt">Ổ ngoài đa nền tảng</span>
+        <span class="tag tg">Thay thế FAT32</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-info reveal">
+    <span class="alert-icon">🧭</span>
+    <div class="alert-body">
+      <h4>Công thức chọn định dạng</h4>
+      <p>Ổ cứng bên trong Windows → NTFS &nbsp;|&nbsp; USB dùng với nhiều thiết bị và file &lt;4GB → FAT32 &nbsp;|&nbsp; USB dùng đa nền tảng hoặc file video &gt;4GB → exFAT</p>
+    </div>
+  </div>
+
+  <!-- NTFS Internals -->
+  <div class="card reveal">
+    <div class="card-label">Cơ chế nội tại · NTFS</div>
+    <h3>NTFS hoạt động bên trong ra sao? MFT &amp; Journaling</h3>
+    <p style="margin-bottom:1rem">NTFS không chỉ lưu dữ liệu — nó còn theo dõi mọi thứ qua hai cơ chế cốt lõi: <strong>Master File Table</strong> (bảng chỉ mục toàn bộ file) và <strong>Journal</strong> (nhật ký giao dịch để chịu lỗi).</p>
+
+    <div class="g2" style="margin-bottom:1rem">
+      <div class="kcard" style="border-top:3px solid var(--blue)">
+        <span class="kcard-icon">🗃️</span>
+        <div class="stat">MFT</div>
+        <h4>Master File Table</h4>
+        <p>Bảng trung tâm lưu siêu dữ liệu của <em>mọi</em> file và thư mục trên phân vùng. Mỗi entry = 1 KB, chứa: tên file, kích thước, timestamp, phân quyền, và địa chỉ cluster chứa dữ liệu thực.</p>
+      </div>
+      <div class="kcard" style="border-top:3px solid var(--teal)">
+        <span class="kcard-icon">📓</span>
+        <div class="stat">$LogFile</div>
+        <h4>Transaction Journal</h4>
+        <p>Nhật ký ghi trước (write-ahead log). Trước khi thực sự thay đổi MFT, NTFS ghi ý định vào journal. Nếu mất điện giữa chừng, Windows đọc journal để rollback về trạng thái nhất quán.</p>
+      </div>
+    </div>
+
+    <!-- MFT visual -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-bottom:1rem;overflow-x:auto">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:.75rem">Cấu trúc một MFT Entry (1024 bytes)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;font-family:var(--mono);font-size:11px">
+        <div style="background:rgba(56,139,253,0.18);border:1px solid rgba(56,139,253,0.35);border-radius:4px;padding:6px 10px;color:var(--blue)">Header<br><span style="font-size:9px;color:var(--text3)">16B</span></div>
+        <div style="background:rgba(57,208,196,0.15);border:1px solid rgba(57,208,196,0.3);border-radius:4px;padding:6px 10px;color:var(--teal)">$STANDARD_INFO<br><span style="font-size:9px;color:var(--text3)">ngày tạo, sửa, phân quyền</span></div>
+        <div style="background:rgba(63,185,80,0.14);border:1px solid rgba(63,185,80,0.3);border-radius:4px;padding:6px 10px;color:var(--green)">$FILE_NAME<br><span style="font-size:9px;color:var(--text3)">tên file, parent dir</span></div>
+        <div style="background:rgba(210,153,34,0.14);border:1px solid rgba(210,153,34,0.3);border-radius:4px;padding:6px 10px;color:var(--amber)">$SECURITY<br><span style="font-size:9px;color:var(--text3)">ACL, owner</span></div>
+        <div style="background:rgba(248,81,73,0.14);border:1px solid rgba(248,81,73,0.3);border-radius:4px;padding:6px 10px;color:var(--red)">$DATA (runs)<br><span style="font-size:9px;color:var(--text3)">địa chỉ cluster thực</span></div>
+      </div>
+      <div style="font-size:.78rem;color:var(--text3);margin-top:.6rem;font-family:var(--mono)">* File nhỏ (&lt;700B) được lưu trực tiếp trong MFT Entry — không tốn cluster riêng (Resident Data)</div>
+    </div>
+
+    <div class="steps">
+      <div class="step" style="border-left-color:var(--teal)"><div class="step-n" style="color:var(--teal)">①</div><div class="step-body"><strong>Khi bạn tạo file mới:</strong> NTFS tìm cluster trống → tạo MFT entry mới với $DATA chứa địa chỉ các cluster đó → cập nhật $Bitmap đánh dấu cluster đã dùng.</div></div>
+      <div class="step" style="border-left-color:var(--amber)"><div class="step-n" style="color:var(--amber)">②</div><div class="step-body"><strong>Journaling — 3 pha:</strong> <em>Log intent</em> → thực hiện thay đổi MFT → <em>Commit</em> vào journal. Nếu crash ở bước 2, Windows chạy <strong>chkdsk /f</strong> để rollback theo journal.</div></div>
+      <div class="step" style="border-left-color:var(--blue)"><div class="step-n" style="color:var(--blue)">③</div><div class="step-body"><strong>Khi xóa file:</strong> NTFS chỉ cập nhật $Bitmap để đánh dấu cluster là trống — dữ liệu thực sự vẫn còn đó cho đến khi bị ghi đè. Đây là lý do phần mềm recovery có thể khôi phục file đã xóa!</div></div>
+      <div class="step" style="border-left-color:var(--green)"><div class="step-n" style="color:var(--green)">④</div><div class="step-body"><strong>Phân quyền ACL:</strong> Mỗi file có danh sách kiểm soát truy cập (Access Control List). Ví dụ: <code>SYSTEM: Full Control</code>, <code>Administrators: Full Control</code>, <code>Users: Read &amp; Execute</code>. Đây là lý do thư mục System32 từ chối xóa dù bạn là Admin.</div></div>
+    </div>
+
+    <div class="alert alert-info" style="margin-top:.75rem">
+      <span class="alert-icon">🔍</span>
+      <div class="alert-body">
+        <h4>Xem MFT và thông tin NTFS bằng lệnh</h4>
+        <p>Mở CMD với quyền Admin và chạy: <code style="font-family:var(--mono);background:var(--surface3);padding:1px 6px;border-radius:3px;color:var(--teal)">fsutil fsinfo ntfsinfo C:</code> — hiện cluster size, tổng MFT size, số MFT entry đã dùng, và nhiều thông tin nội tại khác của NTFS.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ CH4: Cây thư mục ══════════════ -->
+<section id="ch4">
+<div class="divider"></div>
+<div class="chapter">
+  <div class="chapter-header reveal">
+    <div class="ch-num">04</div>
+    <div class="ch-tag">Cấu trúc dữ liệu</div>
+    <h2 class="ch-title">Cây thư mục<br><span class="hi-red">Vùng cấm</span> & vùng an toàn</h2>
+    <p class="ch-desc">Windows tổ chức file theo cấu trúc cây phân cấp. Biết đâu là vùng hệ thống để tránh xóa nhầm — lỗi tốn cả buổi sửa.</p>
+  </div>
+
+  <!-- Legend -->
+  <div class="reveal" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem;align-items:center">
+    <span style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-right:4px">Chú thích:</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;background:var(--red-dim);border:1px solid rgba(248,81,73,0.3);color:var(--red);padding:4px 12px;border-radius:4px;font-family:var(--mono)">🚫 Cấm xóa</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;background:var(--amber-dim);border:1px solid rgba(210,153,34,0.3);color:var(--amber);padding:4px 12px;border-radius:4px;font-family:var(--mono)">⚠️ Thận trọng</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;background:var(--green-dim);border:1px solid rgba(63,185,80,0.3);color:var(--green);padding:4px 12px;border-radius:4px;font-family:var(--mono)">✅ An toàn</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;background:var(--blue-dim);border:1px solid rgba(56,139,253,0.3);color:var(--blue);padding:4px 12px;border-radius:4px;font-family:var(--mono)">💽 Ổ gốc</span>
+  </div>
+
+  <!-- C: Drive -->
+  <div class="reveal" style="margin-bottom:1.25rem">
+    <!-- C:\ root -->
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(56,139,253,0.1);border:1px solid rgba(56,139,253,0.35);border-radius:8px 8px 0 0;padding:12px 16px;">
+      <span style="font-family:var(--display);font-size:2rem;color:var(--blue);line-height:1">C:\</span>
+      <div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--blue)">Ổ hệ thống</div>
+        <div style="font-size:12px;color:var(--text2)">Chứa Windows và phần mềm đã cài — thao tác thận trọng</div>
+      </div>
+      <span style="margin-left:auto;font-size:11px;background:var(--blue-dim);border:1px solid rgba(56,139,253,0.3);color:var(--blue);padding:3px 10px;border-radius:3px;font-family:var(--mono);white-space:nowrap">💽 Drive</span>
+    </div>
+
+    <!-- Windows\ -->
+    <div style="border-left:2px solid rgba(248,81,73,0.4);margin-left:20px">
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.2);border-top:none;padding:10px 14px;position:relative">
+        <span style="color:var(--text3);font-family:var(--mono);font-size:13px;margin-top:1px">├──</span>
+        <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--red)">Windows\</span>
+        <span style="font-size:12px;color:#ff8a80;margin-top:1px">Hệ điều hành Windows — nhân và toàn bộ file hệ thống</span>
+        <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--red-dim);border:1px solid rgba(248,81,73,0.3);color:var(--red);padding:3px 10px;border-radius:3px;font-family:var(--mono)">🚫 Cấm xóa</span>
+      </div>
+      <!-- System32 -->
+      <div style="border-left:2px solid rgba(248,81,73,0.25);margin-left:32px">
+        <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.25);border-top:none;padding:9px 14px">
+          <span style="color:var(--text3);font-family:var(--mono);font-size:12px;margin-top:1px">├──</span>
+          <div>
+            <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--red)">System32\</span>
+            <div style="font-size:11px;color:#ff8a80;margin-top:2px">DLL, driver, công cụ cốt lõi của kernel Windows</div>
+          </div>
+          <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:rgba(248,81,73,0.2);border:1px solid rgba(248,81,73,0.4);color:var(--red);padding:3px 10px;border-radius:3px;font-family:var(--mono);font-weight:700">🚫🚫 TUYỆT ĐỐI</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.15);border-top:none;padding:9px 14px">
+          <span style="color:var(--text3);font-family:var(--mono);font-size:12px;margin-top:1px">├──</span>
+          <div>
+            <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--red)">SysWOW64\</span>
+            <div style="font-size:11px;color:#ff8a80;margin-top:2px">Thư viện 32-bit để chạy ứng dụng cũ trên Windows 64-bit</div>
+          </div>
+          <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--red-dim);border:1px solid rgba(248,81,73,0.3);color:var(--red);padding:3px 10px;border-radius:3px;font-family:var(--mono)">🚫 Cấm xóa</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--surface2);border:1px solid var(--border);border-top:none;padding:9px 14px">
+          <span style="color:var(--text3);font-family:var(--mono);font-size:12px;margin-top:1px">├──</span>
+          <div>
+            <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)">Fonts\</span>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">Font chữ hệ thống — xóa gây lỗi hiển thị</div>
+          </div>
+          <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--red-dim);border:1px solid rgba(248,81,73,0.3);color:var(--red);padding:3px 10px;border-radius:3px;font-family:var(--mono)">🚫 Cấm xóa</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;background:var(--surface2);border:1px solid var(--border);border-top:none;padding:9px 14px">
+          <span style="color:var(--text3);font-family:var(--mono);font-size:12px;margin-top:1px">└──</span>
+          <div>
+            <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--amber)">Temp\</span>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">File tạm — có thể dọn an toàn bằng Disk Cleanup</div>
+          </div>
+          <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--amber-dim);border:1px solid rgba(210,153,34,0.3);color:var(--amber);padding:3px 10px;border-radius:3px;font-family:var(--mono)">⚠️ Có thể dọn</span>
+        </div>
+      </div>
+
+      <!-- Program Files -->
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(248,81,73,0.06);border:1px solid rgba(248,81,73,0.15);border-top:none;padding:10px 14px">
+        <span style="color:var(--text3);font-family:var(--mono);font-size:13px;margin-top:1px">├──</span>
+        <div>
+          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--red)">Program Files\</span>
+          <div style="font-size:12px;color:#ff8a80;margin-top:2px">Phần mềm 64-bit đã cài đặt (Chrome, Office, VS Code…)</div>
+        </div>
+        <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--red-dim);border:1px solid rgba(248,81,73,0.3);color:var(--red);padding:3px 10px;border-radius:3px;font-family:var(--mono)">🚫 Cấm xóa</span>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(248,81,73,0.04);border:1px solid rgba(248,81,73,0.12);border-top:none;padding:10px 14px">
+        <span style="color:var(--text3);font-family:var(--mono);font-size:13px;margin-top:1px">├──</span>
+        <div>
+          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--red)">Program Files (x86)\</span>
+          <div style="font-size:12px;color:#ff8a80;margin-top:2px">Phần mềm 32-bit đã cài đặt trên hệ thống 64-bit</div>
+        </div>
+        <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--red-dim);border:1px solid rgba(248,81,73,0.3);color:var(--red);padding:3px 10px;border-radius:3px;font-family:var(--mono)">🚫 Cấm xóa</span>
+      </div>
+
+      <!-- ProgramData -->
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(210,153,34,0.06);border:1px solid rgba(210,153,34,0.15);border-top:none;padding:10px 14px">
+        <span style="color:var(--text3);font-family:var(--mono);font-size:13px;margin-top:1px">├──</span>
+        <div>
+          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--amber)">ProgramData\</span>
+          <span style="font-family:var(--mono);font-size:10px;background:rgba(210,153,34,0.15);color:var(--amber);padding:2px 6px;border-radius:3px;margin-left:6px">ẨN</span>
+          <div style="font-size:12px;color:#f0c070;margin-top:2px">Dữ liệu cài đặt ứng dụng dùng chung cho mọi user</div>
+        </div>
+        <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--amber-dim);border:1px solid rgba(210,153,34,0.3);color:var(--amber);padding:3px 10px;border-radius:3px;font-family:var(--mono)">⚠️ Thận trọng</span>
+      </div>
+
+      <!-- Recycle.Bin -->
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(210,153,34,0.04);border:1px solid rgba(210,153,34,0.12);border-top:none;padding:10px 14px">
+        <span style="color:var(--text3);font-family:var(--mono);font-size:13px;margin-top:1px">├──</span>
+        <div>
+          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--amber)">$Recycle.Bin\</span>
+          <span style="font-family:var(--mono);font-size:10px;background:rgba(210,153,34,0.15);color:var(--amber);padding:2px 6px;border-radius:3px;margin-left:6px">ẨN</span>
+          <div style="font-size:12px;color:#f0c070;margin-top:2px">Thùng rác — file đã xóa còn lưu tạm ở đây trước khi xóa vĩnh viễn</div>
+        </div>
+        <span style="margin-left:auto;flex-shrink:0;font-size:11px;background:var(--amber-dim);border:1px solid rgba(210,153,34,0.3);color:var(--amber);padding:3px 10px;border-radius:3px;font-family:var(--mono)">⚠️ Thận trọng</span>
+      </div>
+
+      <!-- Users\ -->
+      <div style="display:flex;align-items:flex-start;gap:10px;background:rgba(63,185,80,0.06);border:1px solid rgba(63,185,80,0.2);border-top:none;padding:10px 14px">
+        <span style="color:var(--text3);font-family:var(--mono);font-size:13px;margin-top:1px">└──</span>
+        <div style="flex:1">
+          <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green)">Users\</span>
+          <span style="font-size:12px;color:#8dd4a0;margin-left:8px">Dữ liệu tất cả người dùng trên máy</span>
+          <!-- TênBạn children -->
+          <div style="border-left:2px solid rgba(63,185,80,0.25);margin-left:12px;margin-top:6px">
+            <div style="padding:4px 12px;font-family:var(--mono);font-size:12px;color:var(--green);font-weight:600">└── TênBạn\</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;padding:4px 12px 8px">
+              <div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.2);border-radius:5px;padding:7px 10px">
+                <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">Desktop\</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Màn hình Desktop</div>
+              </div>
+              <div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.2);border-radius:5px;padding:7px 10px">
+                <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">Documents\</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Tài liệu cá nhân</div>
+              </div>
+              <div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.2);border-radius:5px;padding:7px 10px">
+                <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">Downloads\</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">File tải về từ trình duyệt</div>
+              </div>
+              <div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.2);border-radius:5px;padding:7px 10px">
+                <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green)">Pictures\</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Ảnh cá nhân</div>
+              </div>
+              <div style="background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2);border-radius:5px;padding:7px 10px">
+                <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--amber)">AppData\ <span style="font-weight:400;font-size:10px">[ẨN]</span></div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Cài đặt app riêng của user</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span style="flex-shrink:0;font-size:11px;background:var(--green-dim);border:1px solid rgba(63,185,80,0.3);color:var(--green);padding:3px 10px;border-radius:3px;font-family:var(--mono);align-self:flex-start">✅ An toàn</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- D: Drive -->
+  <div class="reveal" style="margin-bottom:1.25rem">
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.35);border-radius:8px 8px 0 0;padding:12px 16px;">
+      <span style="font-family:var(--display);font-size:2rem;color:var(--green);line-height:1">D:\</span>
+      <div>
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">Ổ dữ liệu</div>
+        <div style="font-size:12px;color:var(--text2)">Toàn bộ thuộc về người dùng — tự do sắp xếp theo ý muốn</div>
+      </div>
+      <span style="margin-left:auto;font-size:11px;background:var(--green-dim);border:1px solid rgba(63,185,80,0.3);color:var(--green);padding:3px 10px;border-radius:3px;font-family:var(--mono);white-space:nowrap">✅ Tự do</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:0;border:1px solid rgba(63,185,80,0.2);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">
+      <div style="background:rgba(63,185,80,0.05);border-right:1px solid rgba(63,185,80,0.12);border-bottom:1px solid rgba(63,185,80,0.12);padding:12px 14px">
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">📁 Công việc\</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Tài liệu công việc, dự án</div>
+      </div>
+      <div style="background:rgba(63,185,80,0.05);border-right:1px solid rgba(63,185,80,0.12);border-bottom:1px solid rgba(63,185,80,0.12);padding:12px 14px">
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">🎬 Phim &amp; Nhạc\</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Media giải trí</div>
+      </div>
+      <div style="background:rgba(63,185,80,0.05);border-right:1px solid rgba(63,185,80,0.12);border-bottom:1px solid rgba(63,185,80,0.12);padding:12px 14px">
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">🖼️ Ảnh cá nhân\</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Album ảnh, memories</div>
+      </div>
+      <div style="background:rgba(63,185,80,0.05);padding:12px 14px">
+        <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--green)">💾 Backup\</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Bản sao lưu dự phòng</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-danger reveal">
+    <span class="alert-icon">🚨</span>
+    <div class="alert-body">
+      <h4>Các thư mục TUYỆT ĐỐI không xóa hoặc chỉnh sửa</h4>
+      <p><code style="font-family:var(--mono);background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--red)">Windows\</code> · <code style="font-family:var(--mono);background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--red)">System32\</code> · <code style="font-family:var(--mono);background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--red)">SysWOW64\</code> · <code style="font-family:var(--mono);background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--red)">Program Files\</code> · <code style="font-family:var(--mono);background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--red)">Boot\</code> · <code style="font-family:var(--mono);background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--red)">Recovery\</code><br>Xóa nhầm bất kỳ file nào trong đây có thể khiến Windows mất boot hoàn toàn. Muốn dọn dẹp → dùng <strong>Disk Cleanup</strong> hoặc gỡ cài đặt qua <strong>Settings → Apps</strong>.</p>
+    </div>
+  </div>
+
+  <div class="card reveal">
+    <div class="card-label">Mẹo thực tế</div>
+    <h3>Tại sao nên tách C: và D: riêng biệt?</h3>
+    <p>Khi cần cài lại Windows (format ổ C:), toàn bộ dữ liệu ở ổ D: vẫn nguyên vẹn. Đây là thói quen bắt buộc của người dùng chuyên nghiệp: <strong>hệ thống trên C:, dữ liệu trên D:</strong>.</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ CH5: Thực hành ══════════════ -->
+<section id="ch5">
+<div class="divider"></div>
+<div class="chapter">
+  <div class="chapter-header reveal">
+    <div class="ch-num">05</div>
+    <div class="ch-tag">Thực hành Windows</div>
+    <h2 class="ch-title">Làm chủ<br><span class="hi-green">Disk Management</span></h2>
+    <p class="ch-desc">Ba kỹ năng thiết yếu: chia ổ đĩa, format phân vùng, và nhận diện thư mục hệ thống ngay trên máy thật.</p>
+  </div>
+
+  <!-- Partition slider demo -->
+  <div class="partition-demo reveal">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:.75rem">Mô phỏng chia ổ — Ổ vật lý 500 GB</div>
+    <div class="partition-bar">
+      <div class="pb-c" id="pbC">C: 150 GB</div>
+      <div class="pb-d" id="pbD">D: 350 GB</div>
+    </div>
+    <div class="slider-wrap">
+      <label>Kích thước C:</label>
+      <input type="range" min="15" max="70" value="30" step="1" id="partSlider">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--blue);min-width:65px" id="cLabel">150 GB</span>
+    </div>
+    <div class="slider-rec" id="partRec">💡 Gợi ý: C: 100–150 GB đủ cho Windows + phần mềm cơ bản.</div>
+  </div>
+
+  <!-- Bài 1 -->
+  <div class="card reveal">
+    <div class="card-label">Bài thực hành 1</div>
+    <h3>Chia ổ đĩa thành C: và D: (Disk Management)</h3>
+    <div class="alert alert-warn" style="margin-bottom:1rem">
+      <span class="alert-icon">⚠️</span>
+      <div class="alert-body">
+        <h4>Lưu ý trước khi thực hiện</h4>
+        <p>Backup dữ liệu quan trọng. Quá trình Shrink Volume không xóa dữ liệu, nhưng hãy cẩn thận với bước New Simple Volume.</p>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="step-n">01</div><div class="step-body">Nhấn <strong>Win + X</strong> → chọn <strong>Disk Management</strong> (hoặc gõ <code>diskmgmt.msc</code> vào Run)</div></div>
+      <div class="step"><div class="step-n">02</div><div class="step-body">Chuột phải vào ổ <strong>C:</strong> trong sơ đồ → chọn <strong>Shrink Volume…</strong></div></div>
+      <div class="step"><div class="step-n">03</div><div class="step-body">Trong ô <strong>"Enter the amount of space to shrink in MB"</strong> — nhập lượng MB muốn cắt ra cho D: (ví dụ: <code>204800</code> = 200 GB)</div></div>
+      <div class="step"><div class="step-n">04</div><div class="step-body">Nhấn <strong>Shrink</strong> → đợi xử lý. Vùng màu đen <strong>"Unallocated"</strong> xuất hiện bên phải C:</div></div>
+      <div class="step"><div class="step-n">05</div><div class="step-body">Chuột phải vào vùng <strong>Unallocated</strong> → <strong>New Simple Volume…</strong> → theo wizard: gán tên ổ <strong>D:</strong>, chọn định dạng <strong>NTFS</strong>, nhấn <strong>Finish</strong></div></div>
+    </div>
+  </div>
+
+  <!-- Bài 2 -->
+  <div class="card reveal">
+    <div class="card-label">Bài thực hành 2</div>
+    <h3>Format ổ đĩa / USB</h3>
+    <div class="alert alert-danger" style="margin-bottom:1rem">
+      <span class="alert-icon">🚨</span>
+      <div class="alert-body">
+        <h4>Format = XÓA TOÀN BỘ dữ liệu!</h4>
+        <p>Chỉ format ổ D: hoặc USB. Tuyệt đối không format ổ C: trong khi Windows đang chạy.</p>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="step-n">01</div><div class="step-body">Mở <strong>File Explorer</strong> → chuột phải vào ổ D: hoặc USB cần format</div></div>
+      <div class="step"><div class="step-n">02</div><div class="step-body">Chọn <strong>Format…</strong> từ menu ngữ cảnh</div></div>
+      <div class="step"><div class="step-n">03</div><div class="step-body"><strong>File system:</strong> chọn <code>NTFS</code> cho ổ trong máy, hoặc <code>exFAT</code> cho USB cần dùng đa nền tảng</div></div>
+      <div class="step"><div class="step-n">04</div><div class="step-body"><strong>Allocation unit size:</strong> để <code>Default</code>. Tick <strong>Quick Format</strong> nếu ổ không có bad sector</div></div>
+      <div class="step"><div class="step-n">05</div><div class="step-body">Nhấn <strong>Start</strong> → xác nhận cảnh báo → đợi hoàn tất</div></div>
+    </div>
+  </div>
+
+  <!-- Bài 3 -->
+  <div class="card reveal">
+    <div class="card-label">Bài thực hành 3</div>
+    <h3>Khám phá và nhận diện thư mục hệ thống</h3>
+    <p style="margin-bottom:.75rem">Bật hiển thị file và thư mục ẩn để thấy toàn bộ cấu trúc thực sự của Windows:</p>
+    <div class="code-block no-prefix">File Explorer → View (tab trên cùng) → Show → Hidden items ✓</div>
+    <p style="margin-top:.75rem;margin-bottom:.5rem">Khám phá cấu trúc ổ đĩa bằng Command Prompt (chạy với quyền Admin):</p>
+    <div class="code-block">dir C:\Windows\System32 /p</div>
+    <div class="code-block">tree C:\ /F /A > C:\cay_thu_muc.txt</div>
+    <div class="code-block">msinfo32</div>
+    <div class="alert alert-info" style="margin-top:.75rem">
+      <span class="alert-icon">💡</span>
+      <div class="alert-body">
+        <h4>Lệnh msinfo32</h4>
+        <p>Mở System Information — xem toàn bộ thông tin hệ thống: Windows version, RAM, CPU, và cả thông tin phân vùng ổ đĩa.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bài 4 -->
+  <div class="card reveal">
+    <div class="card-label">Bài thực hành 4</div>
+    <h3>Kiểm tra phân quyền file hệ thống &amp; vì sao không xóa được</h3>
+    <p style="margin-bottom:.75rem">Thực hành trực tiếp xem ACL và hiểu cơ chế bảo vệ file trong ổ C:</p>
+
+    <div class="alert alert-warn" style="margin-bottom:1rem">
+      <span class="alert-icon">⚠️</span>
+      <div class="alert-body">
+        <h4>Bài thực hành quan sát — không chỉnh sửa quyền</h4>
+        <p>Chỉ xem, không thay đổi. Thay đổi phân quyền thư mục hệ thống có thể gây lỗ hổng bảo mật hoặc làm hỏng Windows.</p>
+      </div>
+    </div>
+
+    <p style="margin-bottom:.5rem;font-weight:600;color:var(--text)">Bước 1 — Thử xóa file hệ thống (quan sát thông báo lỗi):</p>
+    <div class="code-block no-prefix">File Explorer → C:\Windows\System32 → thử xóa bất kỳ file .dll nào → quan sát thông báo từ chối</div>
+
+    <p style="margin-top:.75rem;margin-bottom:.5rem;font-weight:600;color:var(--text)">Bước 2 — Xem phân quyền ACL bằng giao diện đồ họa:</p>
+    <div class="code-block no-prefix">Chuột phải vào C:\Windows\System32 → Properties → tab Security</div>
+    <p style="font-size:.85rem;color:var(--text2);margin:.4rem 0 .75rem">→ Quan sát danh sách: <strong>SYSTEM</strong>, <strong>Administrators</strong>, <strong>TrustedInstaller</strong>, <strong>Users</strong> — và cột quyền của từng nhóm (Allow/Deny)</p>
+
+    <p style="margin-bottom:.5rem;font-weight:600;color:var(--text)">Bước 3 — Xem phân quyền bằng CMD (chi tiết hơn):</p>
+    <div class="code-block">icacls C:\Windows\System32</div>
+    <div class="code-block">icacls C:\Windows\System32\notepad.exe</div>
+
+    <p style="margin-top:.75rem;margin-bottom:.5rem;font-weight:600;color:var(--text)">Bước 4 — Kiểm tra NTFS cluster size và thông tin MFT:</p>
+    <div class="code-block">fsutil fsinfo ntfsinfo C:</div>
+    <div class="code-block">fsutil volume diskfree C:</div>
+
+    <p style="margin-top:.75rem;margin-bottom:.5rem;font-weight:600;color:var(--text)">Bước 5 — Xem trạng thái TRIM trên SSD:</p>
+    <div class="code-block">fsutil behavior query DisableDeleteNotify</div>
+    <p style="font-size:.85rem;color:var(--text2);margin:.4rem 0">→ Kết quả <strong style="color:var(--green)">= 0</strong>: TRIM đang bật (tốt). Kết quả <strong style="color:var(--red)">= 1</strong>: TRIM tắt (không tốt cho SSD)</p>
+
+    <div class="alert alert-success" style="margin-top:.75rem">
+      <span class="alert-icon">🎯</span>
+      <div class="alert-body">
+        <h4>Câu hỏi thảo luận sau bài thực hành</h4>
+        <p>1. Tại sao <code style="font-family:var(--mono);background:var(--surface3);padding:1px 5px;border-radius:3px">TrustedInstaller</code> có quyền cao hơn cả Administrator?<br>
+        2. Nếu muốn dọn rác ổ C: an toàn, nên dùng công cụ nào thay vì xóa tay?<br>
+        3. Sau khi format USB, dữ liệu cũ còn khôi phục được không? Tại sao?</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ CH6: QUIZ ══════════════ -->
+<section id="ch6">
+<div class="divider"></div>
+<div class="chapter">
+  <div class="chapter-header reveal">
+    <div class="ch-num">06</div>
+    <div class="ch-tag">Kiểm tra kiến thức</div>
+    <h2 class="ch-title">Bạn đã<br><span class="hi">nắm vững</span> chưa?</h2>
+    <p class="ch-desc">9 câu hỏi bao phủ toàn bộ nội dung bài học — bao gồm cơ chế HDD, NAND Flash, MFT và TRIM. Không giới hạn số lần thử.</p>
+  </div>
+
+  <div class="card reveal quiz-container">
+    <div class="quiz-progress" id="qprog"></div>
+    <div id="quizArea"></div>
+  </div>
+</div>
+</section>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer>
+  File System Management &nbsp;·&nbsp; Quản lý hệ thống file &nbsp;·&nbsp; Bài học tương tác
+</footer>
+
+<script>
+/* ─── HDD GRID ─── */
+(function(){
+  const g = document.getElementById('hddGrid');
+  if(!g) return;
+  const types = [
+    'sys','sys','sys','sys','sys','sys','sys','sys',
+    'used','used','frag','used','used','used','frag','used',
+    'used','','used','used','frag','','used','used',
+    'frag','used','used','','','used','used','frag',
+    'used','','','used','used','frag','','used',
+    '','','used','','used','used','','frag',
+    'used','','','','','used','','',
+    '','','','','','','','',
+  ];
+  const tips = {
+    sys: '🚫 File hệ thống — không xóa!',
+    used: '📁 Dữ liệu người dùng',
+    frag: '⚠️ Phân mảnh — đầu đọc phải di chuyển',
+    '': '⬜ Cluster trống'
+  };
+  types.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'sector' + (t ? ' '+t : '');
+    d.title = tips[t] || '';
+    g.appendChild(d);
+  });
+})();
+
+/* ─── PARTITION SLIDER ─── */
+const ps = document.getElementById('partSlider');
+if(ps){
+  ps.addEventListener('input', function(){
+    const v = parseInt(this.value);
+    const c = Math.round(v * 500 / 100);
+    const d = 500 - c;
+    document.getElementById('pbC').style.width = v + '%';
+    document.getElementById('pbC').textContent = 'C: ' + c + ' GB';
+    document.getElementById('pbD').textContent = 'D: ' + d + ' GB';
+    document.getElementById('cLabel').textContent = c + ' GB';
+    const rec = document.getElementById('partRec');
+    if(c < 80) rec.textContent = '⚠️ Quá nhỏ! Windows + updates cần ít nhất 80 GB.';
+    else if(c <= 150) rec.textContent = '✅ Tốt! ' + c + ' GB cho C: là phù hợp cho hầu hết người dùng.';
+    else if(c <= 250) rec.textContent = '💡 Được, nhưng ' + d + ' GB cho D: có thể hơi ít nếu lưu nhiều.';
+    else rec.textContent = '📦 C: quá lớn. Hãy dành nhiều hơn cho D: để lưu dữ liệu.';
+  });
+}
+
+/* ─── ACTIVE NAV ─── */
+const navLinks = document.querySelectorAll('.fnav-item');
+const chapters = document.querySelectorAll('section[id]');
+window.addEventListener('scroll', () => {
+  let cur = '';
+  chapters.forEach(s => { if(window.scrollY >= s.offsetTop - 120) cur = s.id; });
+  navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#'+cur));
+});
+
+/* ─── REVEAL ON SCROLL ─── */
+const ro = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => ro.observe(el));
+
+/* ─── QUIZ ─── */
+const Qs = [
+  {
+    q: 'Đơn vị nhỏ nhất mà file system có thể cấp phát để lưu file là gì?',
+    opts: ['Sector (512 bytes)', 'Cluster (nhiều sector ghép lại)', 'Byte', 'Track'],
+    ok: 1,
+    good: '✅ Chính xác!',
+    explain: 'Cluster là đơn vị cấp phát của file system. Dù file chỉ có 1 KB, nó vẫn chiếm cả 1 cluster (thường 4 KB). Sector là đơn vị vật lý của ổ đĩa, nhỏ hơn cluster.'
+  },
+  {
+    q: 'Tại sao SSD không bị ảnh hưởng bởi phân mảnh (fragmentation) như HDD?',
+    opts: [
+      'SSD tự động defragment khi chạy',
+      'SSD không có file system',
+      'SSD truy cập dữ liệu bằng điện tử — không có đầu đọc cơ học phải di chuyển',
+      'SSD dùng định dạng FAT32 không bị phân mảnh'
+    ],
+    ok: 2,
+    good: '✅ Hoàn toàn đúng!',
+    explain: 'HDD chậm khi bị phân mảnh vì đầu đọc phải di chuyển vật lý đến nhiều vị trí khác nhau. SSD truy cập bất kỳ cell nhớ nào với tốc độ như nhau — vị trí vật lý không quan trọng.'
+  },
+  {
+    q: 'Bạn cần sao chép file video 8 GB vào USB. USB đang định dạng FAT32. Điều gì xảy ra?',
+    opts: [
+      'File được copy bình thường',
+      'Copy thành công nhưng chất lượng video giảm',
+      'Xuất hiện lỗi "The file is too large" — FAT32 giới hạn file tối đa 4 GB',
+      'USB tự động chuyển sang NTFS'
+    ],
+    ok: 2,
+    good: '✅ Chính xác!',
+    explain: 'FAT32 có giới hạn cứng: mỗi file tối đa 4 GB. Để copy file lớn hơn, bạn cần format USB sang exFAT hoặc NTFS. Giải pháp: Format USB → exFAT.'
+  },
+  {
+    q: 'Thư mục nào trong ổ C: nguy hiểm nhất nếu xóa nhầm?',
+    opts: [
+      'C:\\Users\\TênBạn\\Downloads',
+      'C:\\Windows\\System32',
+      'C:\\Windows\\Temp',
+      'C:\\Users\\TênBạn\\Desktop'
+    ],
+    ok: 1,
+    good: '✅ Đúng rồi!',
+    explain: 'System32 chứa các file DLL và EXE cốt lõi của Windows kernel. Xóa bất kỳ file quan trọng nào trong đây → Windows không khởi động được. Downloads, Temp, Desktop đều an toàn để xóa.'
+  },
+  {
+    q: 'Để chia ổ C: thành C: và D: trên Windows, bạn dùng công cụ nào?',
+    opts: [
+      'Task Manager',
+      'Device Manager',
+      'Disk Management (diskmgmt.msc)',
+      'Registry Editor (regedit)'
+    ],
+    ok: 2,
+    good: '✅ Chính xác!',
+    explain: 'Disk Management (mở bằng Win+X hoặc gõ diskmgmt.msc) cho phép Shrink Volume để thu nhỏ C:, tạo Unallocated space, rồi New Simple Volume để tạo ổ D: mới.'
+  },
+  {
+    q: 'Cấu hình nào là tốt nhất cho máy tính cá nhân?',
+    opts: [
+      'Chỉ dùng 1 ổ HDD dung lượng lớn cho mọi thứ',
+      'SSD NVMe làm ổ C: (hệ thống) + HDD làm ổ D: (lưu trữ)',
+      'Chỉ dùng 1 ổ SSD nhỏ là đủ',
+      'HDD cho ổ C: vì rẻ, SSD cho ổ D: để lưu trữ nhanh'
+    ],
+    ok: 1,
+    good: '✅ Hoàn toàn đúng!',
+    explain: 'SSD NVMe cho ổ C: giúp Windows khởi động cực nhanh và mọi thao tác mượt mà. HDD cho ổ D: đảm bảo lưu trữ phim, ảnh, backup với dung lượng lớn, giá rẻ. Đây là cấu hình lý tưởng nhất về hiệu năng/chi phí.'
+  },
+  {
+    q: 'Khi đầu đọc HDD di chuyển đến đúng track, giai đoạn đó gọi là gì và mất bao lâu?',
+    opts: [
+      'Transfer time — khoảng 0.01ms',
+      'Rotational latency — chờ đĩa quay đến sector',
+      'Seek time — khoảng 3–15ms là nút thắt cổ chai chính của HDD',
+      'Cache hit time — dữ liệu đã có trong buffer'
+    ],
+    ok: 2,
+    good: '✅ Chính xác!',
+    explain: 'Seek time (3–15ms) là thời gian Actuator Arm di chuyển đầu đọc đến đúng track. Đây là lý do HDD thua SSD ở truy cập ngẫu nhiên — SSD không có bộ phận cơ học nên latency chỉ ~0.05ms.'
+  },
+  {
+    q: 'NTFS Master File Table (MFT) lưu thông tin gì?',
+    opts: [
+      'Chỉ lưu tên file và kích thước',
+      'Nội dung thực sự của các file (raw data)',
+      'Siêu dữ liệu của mọi file: tên, kích thước, timestamp, phân quyền ACL, và địa chỉ cluster',
+      'Danh sách các sector bị hỏng (bad sector)'
+    ],
+    ok: 2,
+    good: '✅ Đúng rồi!',
+    explain: 'MFT là "mục lục" của toàn bộ phân vùng NTFS. Mỗi entry 1KB chứa: $STANDARD_INFO (timestamp, quyền), $FILE_NAME (tên, thư mục cha), $SECURITY (ACL), và $DATA runs (địa chỉ cluster lưu dữ liệu thực). File nhỏ <700B được lưu luôn trong MFT entry.'
+  },
+  {
+    q: 'Lệnh nào kiểm tra TRIM có đang bật trên SSD không?',
+    opts: [
+      'chkdsk C: /f',
+      'fsutil behavior query DisableDeleteNotify — kết quả 0 là bật',
+      'defrag C: /U /V',
+      'diskpart → list disk'
+    ],
+    ok: 1,
+    good: '✅ Chính xác!',
+    explain: 'fsutil behavior query DisableDeleteNotify trả về 0 = TRIM đang bật (tốt cho SSD), 1 = TRIM tắt. TRIM cho phép Windows báo SSD biết block nào đã xóa → SSD dọn dẹp trước → duy trì hiệu năng. Không nên defrag SSD vì làm hao mòn TBW không cần thiết.'
+  }
+];
+
+let qi = 0, score = 0, answered = false;
+
+function buildProgress(){
+  const p = document.getElementById('qprog');
+  if(!p) return;
+  p.innerHTML = Qs.map((_,i)=>`<div class="qprog-dot ${i<qi?'done':i===qi?'active':''}"></div>`).join('');
+}
+
+function renderQuiz(){
+  answered = false;
+  buildProgress();
+  const q = Qs[qi];
+  const letters = ['A','B','C','D'];
+  document.getElementById('quizArea').innerHTML = `
+    <div class="quiz-counter">Câu ${qi+1} / ${Qs.length} — Điểm: ${score}</div>
+    <div class="quiz-q">${q.q}</div>
+    <div class="quiz-opts">
+      ${q.opts.map((o,i)=>`<button class="qopt" data-letter="${letters[i]}" onclick="answer(${i})">${o}</button>`).join('')}
+    </div>
+    <div id="qfb"></div>
+  `;
+}
+
+function answer(i){
+  if(answered) return;
+  answered = true;
+  const q = Qs[qi];
+  const opts = document.querySelectorAll('.qopt');
+  opts.forEach((b,idx)=>{
+    b.disabled = true;
+    if(idx === q.ok) b.classList.add('correct');
+    else if(idx === i && i !== q.ok) b.classList.add('wrong');
+  });
+  const ok = i === q.ok;
+  if(ok) score++;
+  document.getElementById('qfb').innerHTML = `
+    <div class="quiz-feedback ${ok?'qf-correct':'qf-wrong'}">
+      <strong>${ok ? q.good : '❌ Chưa đúng!'}</strong>
+      ${q.explain}
+    </div>
+    ${qi < Qs.length-1
+      ? `<button class="quiz-next" onclick="qi++;renderQuiz()">Câu tiếp theo →</button>`
+      : `<button class="quiz-next" onclick="showScore()">Xem kết quả →</button>`
+    }
+  `;
+}
+
+function showScore(){
+  const pct = Math.round(score/Qs.length*100);
+  const msg = pct===100?'Xuất sắc! Bạn nắm vững hoàn toàn 🎯':pct>=70?'Tốt lắm! Ôn lại phần còn thiếu nhé 💪':'Cần ôn tập thêm, thử lại nào! 📚';
+  const col = pct===100?'var(--green)':pct>=70?'var(--blue)':'var(--amber)';
+  document.getElementById('quizArea').innerHTML = `
+    <div class="score-card">
+      <div class="score-num" style="color:${col}">${score}/${Qs.length}</div>
+      <p style="font-size:1.1rem;color:var(--text);font-weight:600;margin-bottom:.4rem">${pct}% chính xác</p>
+      <p>${msg}</p>
+      <button onclick="qi=0;score=0;renderQuiz()">↺ Làm lại từ đầu</button>
+    </div>
+  `;
+  buildProgress();
+}
+
+renderQuiz();
+</script>
+</body>
+</html>
